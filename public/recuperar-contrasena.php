@@ -1,137 +1,73 @@
 <?php
-require_once(VENDOR_PATH . 'autoload.php'); // Cargar Composer's autoloader
+require_once 'funciones.php'; // Archivo con las funciones del usuario
+require_once 'recuperar-contrasena.php'; // Archivo con las funciones para restablecer la contraseña
 
-// Importar las clases de PHPMailer
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
+redirigirSiLogeado(); // Función para volver al index si ya se ha iniciado sesión
+?>
+<!DOCTYPE html>
+<html data-bs-theme="light" lang="es">
 
-/**
- * Funciones para restablecer la contraseña
- */
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+    <title>Recuperar Contraseña - ADSO</title>
+    <meta name="description" content="Clase del 09 de Octubre del 2023">
+    <link rel="stylesheet" href="assets/bootstrap/css/bootstrap.min.css">
+    <link rel='stylesheet' href='assets/fonts/fontawesome-all.min.css'>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lato:300,400,700,300italic,400italic,700italic&amp;display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto+Serif+Dogra&amp;display=swap">
+    <link rel="stylesheet" href="assets/css/styles.css">
+</head>
 
-try {
-    if (isset($_POST['recuperar_contrasena'])) {
+<body id="page-top">
+    <?php require_once 'templates/navbar.php'; ?>
+                <main>
+                    <section class="position-relative py-4 py-xl-5">
+                        <div class="container">
+                            <div class="row mb-5">
+                                <div class="col-md-8 col-xl-6 text-center mx-auto">
+                                    <h2>Recuperar Contraseña</h2>
+                                </div>
+                            </div>
+                            <div class="row d-flex justify-content-center">
+                                <div class="col-md-6 col-xl-4">
+                                    <div class="card mb-5 mx-auto">
+                                        <?php
+                                        echo "\n";
+                                        if (!empty($_SESSION['pswdrst'])) {
+                                            echo $_SESSION['pswdrst'];
+                                            unset($_SESSION['pswdrst']);
+                                        }
+                                        ?><div class="card-body d-flex flex-column align-items-center">
+                                            <div class="bs-icon-xl bs-icon-circle bs-icon-primary bs-icon my-4">
+                                                <svg xmlns='http://www.w3.org/2000/svg' width='1em' height='1em' fill='currentColor' class='bi bi-envelope-arrow-down' viewBox='0 0 16 16'>
+                                                    <path d='M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4.5a.5.5 0 0 1-1 0V5.383l-7 4.2-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h5.5a.5.5 0 0 1 0 1H2a2 2 0 0 1-2-1.99V4Zm1 7.105 4.708-2.897L1 5.383v5.722ZM1 4v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1H2a1 1 0 0 0-1 1Z'/>
+                                                    <path d='M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm.354-1.646a.5.5 0 0 1-.722-.016l-1.149-1.25a.5.5 0 1 1 .737-.676l.28.305V11a.5.5 0 0 1 1 0v1.793l.396-.397a.5.5 0 0 1 .708.708l-1.25 1.25Z'/>
+                                                </svg>
+                                            </div>
+                                            <form method="POST" id="recuperar_contrasena">
+                                                <div class="mb-3">
+                                                    <label class="label" for="correo">Ingresa tu correo</label>
+                                                    <input class="form-control form-control-lg" type="email" name="correo" id="correo" inputmode="email" placeholder="example@gmail.com" required>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <button class="btn btn-primary d-block w-100" type="submit" name="recuperar_contrasena">Recuperar Contraseña</button>
+                                                </div>
+                                            </form>
+                                            <small>¿Ya tienes cuenta? <a href='iniciar-sesion.php'>→ Iniciar Sesión ←</a></small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </main>
+<?php require_once 'templates/footer.php'; ?>
+    
+<script src="assets/js/jquery.min.js"></script>
+<script src="assets/bootstrap/js/bootstrap.min.js"></script>
+<script src="assets/js/theme.js"></script>
 
-        $correo = $_POST['correo'];
-        $Recuperar = recuperarClave($correo);
-    }
-} catch (PDOException $e) {
-    logPDOException($e, 'Descripción de la excepción: ');
-}
+</body>
 
-// Función para verificar si el correo existe en la base de datos
-function verificarSolicitudRestablecerClave(PDO $pdo, string $correo): bool {
-    $sqlRestablecerClave = $pdo->prepare('SELECT Correo FROM restablecer_contrasena WHERE Correo = :correo');
-    $sqlRestablecerClave->bindParam(':correo', $correo, PDO::PARAM_STR);
-    $sqlRestablecerClave->execute();
-    return $sqlRestablecerClave->fetch() !== false;
-}
-
-// Función para generar un token aleatorio
-function generarToken(): string {
-    try {
-        return bin2hex(random_bytes(32));
-    } catch (\Exception $e) {
-        logException($e, 'Error al generar el token: ');
-        return '';
-    }
-}
-
-// Función para insertar el token en la tabla restablecer_contrasena
-function insertarTokenEnTabla(PDO $pdo, string $correo, string $token): void {
-    $hashedToken = password_hash($token, PASSWORD_DEFAULT);
-    $sqlInsertarToken = $pdo->prepare('INSERT INTO restablecer_contrasena (Correo, Token) VALUES (:correo, :token)');
-    $sqlInsertarToken->bindParam(':correo', $correo, PDO::PARAM_STR);
-    $sqlInsertarToken->bindParam(':token', $hashedToken, PDO::PARAM_STR);
-    $sqlInsertarToken->execute();
-}
-
-// Función para enviar el correo electrónico
-function enviarCorreoElectronico(string $correo, string $token): bool
-{
-    $mail = new PHPMailer(true);
-
-    try {
-        // Configuración del servidor SMTP
-        // $mail->SMTPDebug = SMTP::DEBUG_SERVER; // Habilitar la depuración
-        $mail->isSMTP(); // Usar SMTP
-        $mail->Host = 'smtp.gmail.com'; // Nombre del servidor SMTP
-        $mail->SMTPAuth = true; // Habilitar la autenticación SMTP
-        $mail->Username = 'correo de gmail'; // Nombre de usuario SMTP
-        $mail->Password = 'contraseña para aplicaciones'; // Contraseña SMTP
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS; // Habilitar el cifrado TLS; `PHPMailer::ENCRYPTION_SMTPS` también aceptado
-        $mail->Port = 587; // Puerto TCP para conectarse
-        $mail->CharSet = 'UTF-8'; // Establece la codificación a UTF-8
-
-        // Configuración del mensaje
-        $mail->setFrom('dejatori@adso.com', 'ADSO eventos'); // Dirección de correo electrónico del remitente
-        $mail->addAddress($correo); // Dirección de correo electrónico del destinatario
-
-        // Contenido del mensaje
-        $mail->isHTML(true); // Establecer el formato del correo electrónico a HTML
-        $mail->Subject = 'Restablecer contraseña - ADSO eventos'; // Asunto del correo electrónico
-        $mail->Body = '
-            <html lang="es">
-                <head>
-                    <meta charset="utf-8">
-                    <title>Restablecer contraseña</title>
-                </head>
-                <body>
-                    <p>Saludos,</p>
-                    <p>Hemos recibido una solicitud para restablecer la contraseña de su cuenta.</p>
-                    <p>Si no ha solicitado restablecer la contraseña, ignore este mensaje.</p>
-                    <p>Para restablecer su contraseña, haga clic en el siguiente enlace:</p>
-                    <a href="https://localhost/eventos/restablecer-contrasena.php?correo=' . $correo . '&token=' . $token . '">Restablecer contraseña</a>
-                </body>
-            </html>';
-
-        // Enviar el correo electrónico
-        return $mail->send();
-    } catch (Exception $e) {
-        logException($e, 'Error al enviar el correo electrónico: ');
-        return false;
-    }
-}
-
-// Función para el proceso completo de recuperar la clave
-function recuperarClave(string $correo): bool {
-
-    list($pdo, $auth) = obtenerConexionYAuth(); // Obtener la instancia de conexión y autenticación
-
-    if (verificarSolicitudRestablecerClave($pdo, $correo)) {
-        // El correo ya ha solicitado restablecer la contraseña
-        $_SESSION['pswdrst'] = '
-            <div class="alert alert-danger">
-                <strong>Correo no enviado</strong> El correo electrónico: <strong>' . $correo . '</strong>. Ya ha solicitado restablecer la contraseña.
-            </div>';
-        return false;
-    }
-
-    if (!$auth->verificar_correo($correo)) {
-        // El correo no se encuentra registrado
-        $_SESSION['pswdrst'] = '
-                <div class="alert alert-danger">
-                    <strong>Correo no encontrado</strong> El correo electrónico: <strong>' . $correo . '</strong>. No se encuentra registrado.
-                </div>';
-        return false;
-    }
-
-    $token = generarToken();
-    insertarTokenEnTabla($pdo, $correo, $token);
-
-    if (enviarCorreoElectronico($correo, $token)) {
-        // Correo enviado con éxito
-        $_SESSION['pswdrst'] = '
-                    <div class="alert alert-success">
-                        <strong>Correo enviado</strong> Se ha enviado un correo electrónico a: <strong>' . $correo . '</strong>. Siga las instrucciones para restablecer la contraseña.
-                    </div>';
-        return true;
-    } else {
-        // Error al enviar el correo
-        $_SESSION['pswdrst'] = '
-                    <div class="alert alert-danger">
-                        <strong>Correo no enviado</strong> No se ha podido enviar el correo electrónico a: <strong>' . $correo . '</strong>.
-                    </div>';
-        return false;
-    }
-}
+</html>
