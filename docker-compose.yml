@@ -5,7 +5,7 @@ services:
     container_name: web_app
     build: .
     ports:
-      - "82:80"
+      - "80:80"
     volumes:
       - ./public:/var/www/html/
     depends_on:
@@ -24,8 +24,8 @@ services:
       MYSQL_PASSWORD: user1.pa55
       MYSQL_ROOT_PASSWORD: root.pa55
     volumes:
-      - .database/db.sql:/docker-entrypoint-initdb.d
-      - ./eventos/database:/var/lib/mysql
+      - ./database:/docker-entrypoint-initdb.d/
+      
     networks:
       - app_network
 
@@ -35,7 +35,7 @@ services:
     depends_on:
       - db
     ports:
-      - "8082:80"
+      - "8080:80"
     environment:
       MYSQL_USER: user1
       MYSQL_PASSWORD: user1.pa55
